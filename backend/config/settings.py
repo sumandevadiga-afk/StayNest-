@@ -1,8 +1,11 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 
 def env_bool(name, default=False):
@@ -67,6 +70,7 @@ ASGI_APPLICATION = "config.asgi.application"
 
 DATABASES = {
     "default": {
+        # MySQL is the normal database. Values can be supplied through backend/.env.
         "ENGINE": "django.db.backends.mysql",
         "NAME": os.getenv("DATABASE_NAME", "staynest"),
         "USER": os.getenv("DATABASE_USER", "staynest_user"),
@@ -106,8 +110,8 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": __import__("datetime").timedelta(minutes=env_int("JWT_ACCESS_MINUTES", 30)),
-    "REFRESH_TOKEN_LIFETIME": __import__("datetime").timedelta(days=env_int("JWT_REFRESH_DAYS", 7)),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env_int("JWT_ACCESS_MINUTES", 30)),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=env_int("JWT_REFRESH_DAYS", 7)),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
