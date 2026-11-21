@@ -1,20 +1,24 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+import { getHealthStatus } from "./api";
 
 function App() {
-  const [healthState, setHealthState] = useState("Not checked yet");
+  const [healthState, setHealthState] = useState({ status: "idle", message: "Not checked yet" });
 
   async function checkApiHealth() {
-    setHealthState("Checking...");
+    setHealthState({ status: "loading", message: "Checking StayNest API..." });
 
     try {
-      const response = await fetch(`${apiBaseUrl}/health/`);
-      setHealthState(response.ok ? "API is healthy" : `API returned ${response.status}`);
-    } catch {
-      setHealthState("Placeholder: health endpoint is not available yet");
+      const health = await getHealthStatus();
+      setHealthState({ status: "success", message: `${health.service} is healthy` });
+    } catch (error) {
+      setHealthState({ status: "error", message: error.message || "StayNest API is unavailable right now" });
     }
   }
+
+  useEffect(() => {
+    checkApiHealth();
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -80,7 +84,9 @@ function App() {
               </div>
               <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/50 p-4" aria-live="polite">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">API health check</span>
-                <p className="mt-2 text-sm text-slate-200">{healthState}</p>
+                <p className={`mt-2 text-sm ${healthState.status === "error" ? "text-amber-200" : "text-slate-200"}`}>
+                  {healthState.message}
+                </p>
               </div>
             </div>
           </aside>
