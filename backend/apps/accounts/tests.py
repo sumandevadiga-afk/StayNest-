@@ -78,3 +78,57 @@ class JWTAuthenticationTests(TestCase):
         response = self.client.get("/api/auth/me/")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class RolePermissionTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def user_for_role(self, role):
+        return User.objects.create_user(
+            email=f"{role.lower()}@example.com",
+            password="safe-local-password",
+            role=role,
+        )
+
+    def test_all_staff_roles_can_access_staff_scope(self):
+        for role in (
+            User.Role.ADMIN,
+            User.Role.MANAGER,
+            User.Role.RECEPTIONIST,
+            User.Role.HOUSEKEEPING,
+        ):
+            with self.subTest(role=role):
+                self.client.force_authenticate(user=self.user_for_role(role))
+                response = self.client.get("/api/auth/staff-scope/")
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_customer_cannot_access_staff_scope(self):
+        self.client.force_authenticate(user=self.user_for_role(User.Role.CUSTOMER))
+
+        response = self.client.get("/api/auth/staff-scope/")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_only_admin_can_access_admin_scope(self):
+        for role, expected_status in (
+            (User.Role.ADMIN, status.HTTP_200_OK),
+            (User.Role.MANAGER, status.HTTP_403_FORBIDDEN),
+            (User.Role.RECEPTIONIST, status.HTTP_403_FORBIDDEN),
+            (User.Role.HOUSEKEEPING, status.HTTP_403_FORBIDDEN),
+            (User.Role.CUSTOMER, status.HTTP_403_FORBIDDEN),
+        ):
+            with self.subTest(role=role):
+                self.client.force_authenticate(user=self.user_for_role(role))
+                response = self.client.get("/api/auth/admin-scope/")
+                self.assertEqual(response.status_code, expected_status)
+
+    def test_unauthenticated_staff_and_admin_scopes_are_rejected(self):
+        self.assertEqual(
+            self.client.get("/api/auth/staff-scope/").status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+        self.assertEqual(
+            self.client.get("/api/auth/admin-scope/").status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
