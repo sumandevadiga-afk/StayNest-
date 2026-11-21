@@ -2,7 +2,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from .models import User
+from .models import CustomerProfile, User
 
 
 class JWTAuthenticationTests(TestCase):
@@ -132,3 +132,77 @@ class RolePermissionTests(TestCase):
             self.client.get("/api/auth/admin-scope/").status_code,
             status.HTTP_401_UNAUTHORIZED,
         )
+
+
+class CustomerProfileTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.customer = User.objects.create_user(
+            "profile-customer@example.com",
+            "password",
+            role=User.Role.CUSTOMER,
+        )
+        self.other_customer = User.objects.create_user(
+            "other-customer@example.com",
+            "password",
+            role=User.Role.CUSTOMER,
+        )
+        self.profile = CustomerProfile.objects.create(user=self.customer)
+        CustomerProfile.objects.create(user=self.other_customer)
+        self.manager = User.objects.create_user("profile-manager@example.com", "password", role=User.Role.MANAGER)
+        self.receptionist = User.objects.create_user("profile-reception@example.com", "password", role=User.Role.RECEPTIONIST)
+        self.admin = User.objects.create_user("profile-admin@example.com", "password", role=User.Role.ADMIN)
+        self.housekeeper = User.objects.create_user("profile-housekeeper@example.com", "password", role=User.Role.HOUSEKEEPING)
+
+    def test_customer_registration_creates_empty_profile(self):
+        response = self.client.post(
+            "/api/auth/register/",
+            {"email": "new-customer@example.com", "password": "safe-password"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        created_user = User.objects.get(email="new-customer@example.com")
+        self.assertTrue(CustomerProfile.objects.filter(user=created_user).exists())
+
+    def test_customer_can_view_and_edit_only_own_profile(self):
+        self.client.force_authenticate(user=self.customer)
+        response = self.client.get("/api/auth/profile/")
+        update_response = self.client.patch(
+            "/api/auth/profile/",
+            {"phone_number": "+91 98765 43210", "city": "Bengaluru"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["user_email"], self.customer.email)
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.city, "Bengaluru")
+
+    def test_customer_profile_fields_are_validated(self):
+        self.client.force_authenticate(user=self.customer)
+
+        response = self.client.patch(
+            "/api/auth/profile/",
+            {"phone_number": "not-a-phone"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_operations_staff_can_view_profiles_but_housekeeping_cannot(self):
+        for user in (self.admin, self.manager, self.receptionist):
+            with self.subTest(role=user.role):
+                self.client.force_authenticate(user=user)
+                response = self.client.get("/api/auth/profiles/")
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(len(response.data), 2)
+
+        self.client.force_authenticate(user=self.housekeeper)
+        response = self.client.get("/api/auth/profiles/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_profiles_are_not_public(self):
+        self.assertEqual(self.client.get("/api/auth/profile/").status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(self.client.get("/api/auth/profiles/").status_code, status.HTTP_401_UNAUTHORIZED)

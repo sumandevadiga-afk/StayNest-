@@ -1,3 +1,4 @@
+from django.core.validators import RegexValidator
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from django.utils import timezone
@@ -28,3 +29,27 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+class CustomerProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="customer_profile")
+    phone_number = models.CharField(
+        max_length=30,
+        blank=True,
+        validators=[RegexValidator(r"^\+?[0-9 ()-]{7,30}$", "Enter a valid phone number.")],
+    )
+    address = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    emergency_contact_name = models.CharField(max_length=150, blank=True)
+    emergency_contact_phone = models.CharField(
+        max_length=30,
+        blank=True,
+        validators=[RegexValidator(r"^\+?[0-9 ()-]{7,30}$", "Enter a valid emergency phone number.")],
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Profile for {self.user.email}"

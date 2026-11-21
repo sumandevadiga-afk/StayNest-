@@ -45,3 +45,15 @@ class IsStaffRole(HasRole):
 
 class IsAdminRole(IsAdmin):
     pass
+
+
+class IsCustomerProfileOwner(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated)
+
+    def has_object_permission(self, request, view, obj):
+        return request.user.role == User.Role.CUSTOMER and obj.user_id == request.user.id
+
+
+class IsCustomerProfileStaff(HasRole):
+    allowed_roles = frozenset({User.Role.ADMIN, User.Role.MANAGER, User.Role.RECEPTIONIST})

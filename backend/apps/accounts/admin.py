@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import User
+from .models import CustomerProfile, User
 
 
 @admin.register(User)
@@ -21,3 +21,10 @@ class CustomUserAdmin(UserAdmin):
             "fields": ("email", "password1", "password2", "role", "is_active", "is_staff"),
         }),
     )
+
+
+@admin.register(CustomerProfile)
+class CustomerProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "phone_number", "city", "country", "updated_at")
+    search_fields = ("user__email", "phone_number", "city", "country")
+    list_filter = ("country", "city")
