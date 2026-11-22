@@ -47,3 +47,22 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking {self.pk} - {self.room.room_number}"
+
+
+class QRToken(models.Model):
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="qr_tokens")
+    token_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("booking", "expires_at")),
+            models.Index(fields=("token_hash",)),
+        ]
+
+    def __str__(self):
+        return f"QR token for booking {self.booking_id}"

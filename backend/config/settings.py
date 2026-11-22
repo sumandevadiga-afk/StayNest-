@@ -69,6 +69,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
+QR_TOKEN_EXPIRY_MINUTES = env_int("QR_TOKEN_EXPIRY_MINUTES", 15)
 
 DATABASES = {
     "default": {

@@ -9,6 +9,8 @@ import {
   logoutUser,
   registerUser,
 } from "./api";
+import QrCodePage from "./QrCodePage";
+import ReceptionScannerPage from "./ReceptionScannerPage";
 
 const STAFF_ROLES = ["ADMIN", "MANAGER", "RECEPTIONIST", "HOUSEKEEPING"];
 const emptyForm = { email: "", password: "", first_name: "", last_name: "" };
@@ -42,6 +44,10 @@ function DashboardPage({ user, scope = "dashboard" }) {
         <p className="mt-4 text-slate-400">Signed in as {user.email} · Role: {user.role}</p>
         <div className="mt-10 grid gap-4 sm:grid-cols-3">
           {['Reservations', 'Guests', 'Room operations'].map((label) => <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-6" key={label}><span className="text-sm text-slate-400">{label}</span><strong className="mt-3 block text-3xl text-white">—</strong></div>)}
+        </div>
+        <div className="mt-8 flex flex-wrap gap-3">
+          {user.role === "CUSTOMER" && <Link className="rounded-full bg-cyan-300 px-5 py-3 font-bold text-slate-950" to="/customer/qr">Show my QR code</Link>}
+          {STAFF_ROLES.includes(user.role) && <Link className="rounded-full bg-cyan-300 px-5 py-3 font-bold text-slate-950" to="/reception/scanner">Open QR scanner</Link>}
         </div>
       </div>
     </div>
@@ -137,6 +143,8 @@ function App() {
         <Route path="/dashboard" element={<ProtectedRoute user={user}><DashboardPage user={user} /></ProtectedRoute>} />
         <Route path="/staff" element={<ProtectedRoute user={user} allowedRoles={STAFF_ROLES}><DashboardPage user={user} scope="staff" /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute user={user} allowedRoles={["ADMIN"]}><DashboardPage user={user} scope="admin" /></ProtectedRoute>} />
+        <Route path="/customer/qr" element={<ProtectedRoute user={user} allowedRoles={["CUSTOMER"]}><QrCodePage /></ProtectedRoute>} />
+        <Route path="/reception/scanner" element={<ProtectedRoute user={user} allowedRoles={STAFF_ROLES}><ReceptionScannerPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

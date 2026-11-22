@@ -60,3 +60,22 @@ export function logoutUser() {
 export function getCurrentUser() {
   return apiRequest("/auth/me/");
 }
+
+export function getBookingQr(bookingId) {
+  return apiRequest(`/bookings/${bookingId}/qr/`);
+}
+
+export function checkInBooking(bookingId) {
+  return apiRequest(`/bookings/${bookingId}/check-in/`, { method: "POST" });
+}
+
+export function checkOutBooking(bookingId) {
+  return apiRequest(`/bookings/${bookingId}/check-out/`, { method: "POST" });
+}
+
+export function consumeQrToken(token, action) {
+  return apiRequest("/bookings/qr/consume/", {
+    method: "POST",
+    body: JSON.stringify({ token, action }),
+  });
+}

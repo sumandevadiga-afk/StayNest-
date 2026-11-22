@@ -1,4 +1,7 @@
+from django.db import transaction
+from django.utils import timezone
 from rest_framework import status, viewsets
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -7,9 +10,16 @@ from apps.accounts.models import User
 from apps.rooms.models import Room
 from apps.rooms.serializers import RoomSerializer
 
-from .models import Booking
-from .permissions import BookingAccessPermission, BookingWritePermission, STAFF_ROLES
-from .serializers import AvailabilityQuerySerializer, BookingSerializer
+from .models import Booking, QRToken
+from .permissions import (
+    BookingAccessPermission,
+    BookingOwnerOrReceptionPermission,
+    BookingWritePermission,
+    ReceptionOperationsPermission,
+    STAFF_ROLES,
+)
+from .serializers import AvailabilityQuerySerializer, BookingSerializer, QRTokenConsumeSerializer, QRTokenSerializer
+from .services import check_in_booking, check_out_booking, hash_qr_token, issue_qr_token, qr_png_data_uri
 
 
 class BookingViewSet(viewsets.ModelViewSet):
@@ -61,3 +71,74 @@ class AvailabilityView(APIView):
             "check_out_date": check_out,
             "rooms": RoomSerializer(rooms, many=True).data,
         })
+
+
+class BookingQRCodeView(APIView):
+    permission_classes = (BookingOwnerOrReceptionPermission,)
+
+    def get(self, request, pk):
+        booking = Booking.objects.select_related("customer", "room").filter(pk=pk).first()
+        if not booking:
+            raise NotFound("Booking not found.")
+        if request.user.role not in STAFF_ROLES and booking.customer_id != request.user.id:
+            raise NotFound("Booking not found.")
+        token, raw_token = issue_qr_token(booking)
+        return Response({
+            "booking_id": booking.id,
+            "qr_code": qr_png_data_uri(raw_token),
+            "expires_at": token.expires_at,
+            "token": QRTokenSerializer(token).data,
+        })
+
+
+class BookingCheckInView(APIView):
+    permission_classes = (ReceptionOperationsPermission,)
+
+    def post(self, request, pk):
+        booking = check_in_booking(pk)
+        return Response(BookingSerializer(booking, context={"request": request}).data)
+
+
+class BookingCheckOutView(APIView):
+    permission_classes = (ReceptionOperationsPermission,)
+
+    def post(self, request, pk):
+        booking = check_out_booking(pk)
+        return Response(BookingSerializer(booking, context={"request": request}).data)
+
+
+class QRTokenConsumeView(APIView):
+    permission_classes = (ReceptionOperationsPermission,)
+
+    def post(self, request):
+        serializer = QRTokenConsumeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        digest = hash_qr_token(serializer.validated_data["token"])
+        with transaction.atomic():
+            token = QRToken.objects.select_for_update().select_related("booking").filter(token_hash=digest).first()
+            if not token:
+                raise ValidationError({"token": "Invalid QR token."})
+            now = timezone.now()
+            if token.revoked_at:
+                raise ValidationError({"token": "This QR token has been revoked."})
+            if token.used_at:
+                raise ValidationError({"token": "This QR token has already been used."})
+            if token.expires_at <= now:
+                raise ValidationError({"token": "This QR token has expired."})
+            action = serializer.validated_data["action"]
+            booking = check_in_booking(token.booking_id) if action == "check_in" else check_out_booking(token.booking_id)
+            token.used_at = now
+            token.save(update_fields=("used_at",))
+        return Response({"booking": BookingSerializer(booking, context={"request": request}).data})
+
+
+class QRTokenRevokeView(APIView):
+    permission_classes = (ReceptionOperationsPermission,)
+
+    def post(self, request, pk):
+        token = QRToken.objects.filter(pk=pk).first()
+        if not token:
+            raise NotFound("QR token not found.")
+        token.revoked_at = timezone.now()
+        token.save(update_fields=("revoked_at",))
+        return Response(QRTokenSerializer(token).data)

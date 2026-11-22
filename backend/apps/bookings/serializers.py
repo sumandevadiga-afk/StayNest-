@@ -5,7 +5,7 @@ from apps.accounts.models import User
 from apps.rooms.models import Room
 from apps.rooms.serializers import RoomSerializer
 
-from .models import Booking
+from .models import Booking, QRToken
 
 
 class BookingSerializer(serializers.ModelSerializer):
@@ -84,3 +84,15 @@ class AvailabilityQuerySerializer(serializers.Serializer):
         if attrs["check_out_date"] <= attrs["check_in_date"]:
             raise serializers.ValidationError({"check_out_date": "Check-out must be after check-in."})
         return attrs
+
+
+class QRTokenConsumeSerializer(serializers.Serializer):
+    token = serializers.CharField(trim_whitespace=True)
+    action = serializers.ChoiceField(choices=("check_in", "check_out"))
+
+
+class QRTokenSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QRToken
+        fields = ("id", "expires_at", "revoked_at", "used_at", "created_at")
+        read_only_fields = fields
