@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.bookings",
     "apps.billing",
     "apps.analytics",
+    "apps.reviews",
 ]
 
 MIDDLEWARE = [
